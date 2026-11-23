@@ -53,3 +53,30 @@ machine has 2, so 4 workers gave about 2x, not 4x.
 
 A blocking call inside `async def` stops the event loop, so requests are served one at a
 time. The same call in a plain `def` runs in a worker thread and the others keep moving.
+
+## Lab 3: images
+
+Same cloud workspace as above (Linux, 2 CPU cores, amd64).
+
+| Image | Size | Build time | Runs as | `leaked.env` inside |
+|---|---|---|---|---|
+| `fraud-service:naive` (`Dockerfile.naive`) | not measured | not measured | not measured | not measured |
+| `fraud-service:dev` (multi-stage `Dockerfile`) | 803 MB | 48 s | `appuser` | no |
+
+The naive image was not built in this workspace: Docker Hub rate-limited the pull of its
+`python:3.12` base image. Build it on your own machine to fill in that row.
+
+Rebuild of `fraud-service:dev` after a one-line change to `routes.py`: 0.5 s. Every layer
+up to the model was `CACHED`; only `COPY src/` ran again.
+
+## Lab 3: the service in a container
+
+Compose stack (`fraud-api` with 2 workers and a 512 MB limit, plus `feature-cache`):
+
+| Measurement | Value |
+|---|---|
+| Load test p50 | 77.4 ms |
+| Load test p99 | 202.8 ms (Lab 2b: 311.0 ms with 1 worker, 241.2 ms with 4) |
+| Load test throughput | 295 req/s, 0 non-2xx |
+| Memory after the load test (`docker stats`) | 296 MiB of 512 MiB (58%) |
+| `docker compose stop fraud-api` | 0.6 s (graceful: uvicorn is PID 1 and receives SIGTERM) |
