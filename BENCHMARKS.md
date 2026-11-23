@@ -80,3 +80,23 @@ Compose stack (`fraud-api` with 2 workers and a 512 MB limit, plus `feature-cach
 | Load test throughput | 295 req/s, 0 non-2xx |
 | Memory after the load test (`docker stats`) | 296 MiB of 512 MiB (58%) |
 | `docker compose stop fraud-api` | 0.6 s (graceful: uvicorn is PID 1 and receives SIGTERM) |
+
+## Lab 4: the test suite
+
+Same cloud workspace as above.
+
+| Run | Tests | Time |
+|---|---|---|
+| `pytest -m unit` | 16 passed | 0.03 s |
+| `pytest -m integration` | 46 passed (40 from the malformed payloads) | 5.2 s |
+| `pytest -m "behavioural and not slow"` | 5 passed | 0.8 s |
+| `pytest -m slow` (golden file, 5,000 rows) | 1 passed | 15.9 s |
+| `pytest -m "not slow" --cov` (the per-commit gate) | 67 passed, coverage 100% | 1.7 s |
+| `pytest` (everything) | 68 passed | 14.8 s |
+
+Coverage counts `src/fraud_service` except `batch.py`, which `pyproject.toml` omits. That
+makes the batch entrypoint the riskiest untested code: a test that runs it on a three-row
+CSV and checks the output columns would cover it.
+
+With the `hour <= 6` bug put back on purpose, `test_night_flag_boundaries[6-0]` (unit) failed
+in about a second and `test_golden_scores` (behavioural, slow) reported skew on 182 rows.
